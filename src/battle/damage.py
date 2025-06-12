@@ -12,6 +12,25 @@ TYPE_EFFECTIVENESS = {
     "Dragón":    {"Dragón": 2.0}
 }
 
+#obtener el mensaje de efectividad de un movimiento
+def get_effectivenessMessage(move: Move, defender: Pokemon) -> str:
+    """
+    Obtiene un mensaje de efectividad del movimiento contra el defensor.
+    """
+    effectiveness = 1.0
+    for t in defender.types:
+        effectiveness *= TYPE_EFFECTIVENESS.get(move.move_type, {}).get(t, 1.0)
+
+    if effectiveness == 0:
+        return f"{move.name} no afecta a {defender.name}!"
+    elif effectiveness > 1:
+        return f"¡{move.name} es super efectivo contra {defender.name}!"
+    elif effectiveness < 1:
+        return f"{move.name} no es muy efectivo contra {defender.name}…"
+    else:
+        return f"{move.name} tiene un efecto normal contra {defender.name}."
+    
+
 def calculate_damage(move: Move, attacker: Pokemon, defender: Pokemon) -> int:
     """
     Calcula daño teniendo en cuenta:
@@ -36,13 +55,5 @@ def calculate_damage(move: Move, attacker: Pokemon, defender: Pokemon) -> int:
 
     # 5) Cálculo final
     damage = int(base * effectiveness * stab * variation)
-
-    # 6) Mensajes de efectividad
-    if effectiveness == 0:
-        print(f"{move.name} no afecta a {defender.name}!")
-    elif effectiveness > 1:
-        print(f"¡{move.name} es super efectivo contra {defender.name}!")
-    elif effectiveness < 1:
-        print(f"{move.name} no es muy efectivo contra {defender.name}…")
-
+    
     return damage
