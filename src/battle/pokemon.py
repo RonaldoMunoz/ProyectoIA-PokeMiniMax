@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List
+from src.battle.pokemondata import POKEMON_DATA
 
 @dataclass
 class Move:
@@ -30,3 +31,12 @@ class Pokemon:
     
     def __str__(self):
         return f"{self.name} ({'/'.join(self.types)}) - PS: {self.current_hp}/{self.max_hp}"
+def create_pokemon(name: str) -> Pokemon:
+    data = POKEMON_DATA.get(name)
+    if not data:
+        raise ValueError(f"No se encontró el Pokémon '{name}' en los datos.")
+    
+    moves = [Move(m["name"], m["type"], m["power"]) for m in data["moves"]]
+    return Pokemon(name=name, types=data["types"], hp=data["hp"], moves=moves)
+def get_all_pokemon_names():
+    return list(POKEMON_DATA.keys())

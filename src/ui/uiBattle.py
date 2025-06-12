@@ -1,6 +1,8 @@
 import arcade
 import os
 import random
+from ..battle.pokemon import create_pokemon, Pokemon, get_all_pokemon_names
+
 
 # Configuración de la ventana
 SCREEN_WIDTH = 800
@@ -13,26 +15,6 @@ OPPONENT_SCALE = 1.6
 # Ruta a assets
 ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
 
-POKEMON_DATA = {
-    "Charizard": {
-        "hp": 150,
-        "attacks": [
-            {"name": "Lanzallamas", "type": "Fuego", "power": 90},
-            {"name": "Garra Dragón", "type": "Dragón", "power": 80},
-            {"name": "Giro Fuego", "type": "Fuego", "power": 60},
-            {"name": "Tajo Aéreo", "type": "Volador", "power": 75}
-        ]
-    },
-    "Blastoise": {
-        "hp": 160,
-        "attacks": [
-            {"name": "Hidrobomba", "type": "Agua", "power": 110},
-            {"name": "Rayo Hielo", "type": "Hielo", "power": 90},
-            {"name": "Cabezazo", "type": "Normal", "power": 70},
-            {"name": "Pistola Agua", "type": "Agua", "power": 40}
-        ]
-    }
-}
 
 class MainMenuView(arcade.View):
     def __init__(self):
@@ -93,18 +75,38 @@ class PokemonSelectionView(arcade.View):
     def __init__(self):
         super().__init__()
         self.selection = None
+        self.background = None
+        self.font_name = None
+        self.pokemon_options = []
 
     def on_show(self):
-
         # Cargar fondo
         background_path = os.path.join(ASSETS_PATH, "backgrounds", "fondo2.jpg")
         if os.path.exists(background_path):
             self.background = arcade.load_texture(background_path)
 
         # Registrar fuente personalizada
-        self.font_name = "Pokemon Solid"  # Es el nombre interno de la fuente
+        self.font_name = "Pokemon Solid"
         font_path = os.path.join(ASSETS_PATH, "fonts", "Pokemon_Solid.ttf")
         arcade.load_font(font_path)
+
+        # Obtener nombres de Pokémon dinámicamente
+        all_names = get_all_pokemon_names()
+
+        # Crear botones en cuadrícula
+        self.pokemon_options.clear()
+        cols = 3
+        spacing_x = 180
+        spacing_y = 120
+        start_x = 250
+        start_y = SCREEN_HEIGHT // 2 + 50
+
+        for i, name in enumerate(all_names):
+            col = i % cols
+            row = i // cols
+            x = start_x + col * spacing_x
+            y = start_y - row * spacing_y
+            self.pokemon_options.append((name, (x, y), (200, 100)))  # (nombre, posición, tamaño)
 
     def on_draw(self):
         self.clear()
@@ -115,34 +117,36 @@ class PokemonSelectionView(arcade.View):
         else:
             arcade.set_background_color(arcade.color.LIGHT_BLUE)
 
-        arcade.draw_text("ELIGE TU POKEMON", SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 150, arcade.color.VIOLET, 40, font_name=self.font_name, anchor_x="center")
-        # Opciones de Pokémon
-        arcade.draw_rectangle_filled(250, 300, 200, 100, arcade.color.VIOLET)
-        arcade.draw_text("Charizard", 250, 300, arcade.color.WHITE, 20, anchor_x="center", anchor_y="center", font_name=self.font_name)
+        # Título
+        arcade.draw_text("ELIGE TU POKEMON", SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 250,
+                         arcade.color.VIOLET, 40, font_name=self.font_name, anchor_x="center")
 
-        arcade.draw_rectangle_filled(550, 300, 200, 100, arcade.color.VIOLET)
-        arcade.draw_text("Blastoise", 550, 300, arcade.color.WHITE, 20, anchor_x="center", anchor_y="center", font_name=self.font_name)
+        # Dibujar opciones
+        for name, (x, y), (w, h) in self.pokemon_options:
+            arcade.draw_rectangle_filled(x, y, w, h, arcade.color.VIOLET)
+            arcade.draw_text(name, x, y, arcade.color.WHITE, 20,
+                             anchor_x="center", anchor_y="center", font_name=self.font_name)
 
     def on_mouse_press(self, x, y, button, modifiers):
-        if 150 < x < 350 and 250 < y < 350:
-            selected_pokemon = "Charizard"
-        elif 450 < x < 650 and 250 < y < 350:
-            selected_pokemon = "Blastoise"
-        else:
-            return
-
-        battle_view = PokemonBattleUI(selected_pokemon)
-        self.window.show_view(battle_view)
+        for name, (bx, by), (bw, bh) in self.pokemon_options:
+            if bx - bw / 2 < x < bx + bw / 2 and by - bh / 2 < y < by + bh / 2:
+                selected_pokemon = create_pokemon(name)
+                battle_view = PokemonBattleUI(selected_pokemon)
+                self.window.show_view(battle_view)
+                break
 
 
 class PokemonBattleUI(arcade.View):
-    def __init__(self, selected_pokemon):
+    def __init__(self, selected_pokemon: Pokemon):
         super().__init__()
         self.player_pokemon = selected_pokemon
-        self.opponent_pokemon = "Blastoise" if selected_pokemon == "Charizard" else "Charizard"
-        self.player_hp = POKEMON_DATA[self.player_pokemon]["hp"]
+        possible_opponents = [name for name in get_all_pokemon_names() if name != selected_pokemon.name]
+        opponent_name = random.choice(possible_opponents)
+        self.opponent_pokemon = create_pokemon(opponent_name)
+
+        self.player_hp = self.player_pokemon.current_hp
         self.player_max_hp = self.player_hp
-        self.opponent_hp = POKEMON_DATA[self.opponent_pokemon]["hp"]
+        self.opponent_hp = self.opponent_pokemon.current_hp
         self.opponent_max_hp = self.opponent_hp
         self.message = "¡Comienza el combate!"
         self.attack_buttons = []
@@ -153,42 +157,42 @@ class PokemonBattleUI(arcade.View):
         self.font = None
         self.background = None
 
-        # Precargar fuente
+        # Fuente y fondo
         font_path = os.path.join(ASSETS_PATH, "fonts", "pokemon.ttf")
         if os.path.exists(font_path):
             arcade.load_font(font_path)
             self.font = "pokemon.ttf"
 
-        # Precargar fondo
         bg_path = os.path.join(ASSETS_PATH, "backgrounds", "backgroundBattle.png")
         if os.path.exists(bg_path):
             self.background = arcade.load_texture(bg_path)
 
-        # Setup inicial
         self.setup()
 
     def setup(self):
-        """Configurar sprites y botones según el Pokémon seleccionado."""
-        player_path = os.path.join(ASSETS_PATH, "pokemon", f"{self.player_pokemon}.png")
+        player_path = os.path.join(ASSETS_PATH, "pokemon", f"{self.player_pokemon.name}.png")
         if os.path.exists(player_path):
             self.player_sprite = arcade.Sprite(player_path, scale=PLAYER_SCALE)
             self.player_sprite.center_x = 200
             self.player_sprite.center_y = 160
 
-        opp_path = os.path.join(ASSETS_PATH, "pokemon", f"{self.opponent_pokemon}.png")
+        opp_path = os.path.join(ASSETS_PATH, "pokemon", f"{self.opponent_pokemon.name}.png")
         if os.path.exists(opp_path):
             self.opponent_sprite = arcade.Sprite(opp_path, scale=OPPONENT_SCALE)
             self.opponent_sprite.center_x = 600
             self.opponent_sprite.center_y = 450
 
-        attacks = POKEMON_DATA[self.player_pokemon]["attacks"]
+        attacks = self.player_pokemon.moves
         positions = [(200, 80), (450, 80), (200, 40), (450, 40)]
 
         self.attack_buttons = []
         for attack, (x, y) in zip(attacks, positions):
-            button = attack.copy()
-            button["x"] = x
-            button["y"] = y
+            button = {
+                "name": attack.name,
+                "move": attack,
+                "x": x,
+                "y": y
+            }
             self.attack_buttons.append(button)
 
         arcade.schedule(self.ai_turn, 3.0)
@@ -240,12 +244,12 @@ class PokemonBattleUI(arcade.View):
         self.draw_health_bar(
             600, 520,
             self.opponent_hp, self.opponent_max_hp,
-            self.opponent_pokemon, is_opponent=True
+            self.opponent_pokemon.name, is_opponent=True
         )
         self.draw_health_bar(
             200, 220,
             self.player_hp, self.player_max_hp,
-            self.player_pokemon, is_opponent=False
+            self.player_pokemon.name, is_opponent=False
         )
 
         # Panel de ataques
@@ -262,27 +266,28 @@ class PokemonBattleUI(arcade.View):
 
         # Botones
         type_colors = {
-            "Fuego": arcade.color.RED,
-            "Agua": arcade.color.BLUE,
-            "Planta": arcade.color.GREEN,
-            "Eléctrico": arcade.color.YELLOW,
-            "Volador": arcade.color.LIGHT_BLUE,
-            "Dragón": arcade.color.PURPLE,
+            "Fire": arcade.color.RED,
+            "Water": arcade.color.BLUE,
+            "Grass": arcade.color.GREEN,
+            "Eletric": arcade.color.YELLOW,
+            "Flying": arcade.color.LIGHT_BLUE,
+            "Dragon": arcade.color.PURPLE,
             "Normal": arcade.color.LIGHT_GRAY
         }
         for btn in self.attack_buttons:
-            color = type_colors.get(btn["type"], arcade.color.LIGHT_GRAY)
-            border = (arcade.color.GOLD if self.selected_attack==btn["name"]
-                      else arcade.color.BLACK)
+            color = type_colors.get(btn["move"].move_type, arcade.color.LIGHT_GRAY)
+            move = btn["move"]
+            border = (arcade.color.GOLD if self.selected_attack == move.name else arcade.color.BLACK)
             arcade.draw_rectangle_filled(btn["x"], btn["y"], 200, 30, color)
             arcade.draw_rectangle_outline(btn["x"], btn["y"], 200, 30, border, 2)
             arcade.draw_text(
-                btn["name"],
-                btn["x"], btn["y"],
-                arcade.color.BLACK, 14,
-                anchor_x="center", anchor_y="center",
-                font_name=self.font
+            move.name,
+            btn["x"], btn["y"],
+            arcade.color.BLACK, 14,
+            anchor_x="center", anchor_y="center",
+            font_name=self.font
             )
+
 
     def draw_health_bar(self, x, y, current, maximum, name, is_opponent):
         """Barra de vida estilo Pokémon con texto centrado y nombre."""
@@ -336,54 +341,54 @@ class PokemonBattleUI(arcade.View):
                     break
 
     def use_attack(self, attack):
-        """Turno jugador."""
-        self.message = f"¡{self.player_pokemon} usó {attack['name']}!"
+        self.message = f"¡{self.player_pokemon.name} usó {attack['name']}!"
         self.effectiveness_message = ""
-        eff = random.choice(["normal","super","not_very"])
-        base = attack["power"]
-        if eff=="super":
-            dmg = int(base*1.5*random.uniform(0.9,1.1))
+
+        eff = random.choice(["normal", "super", "not_very"])
+        base = attack["move"].power
+
+        if eff == "super":
+            dmg = int(base * 1.5 * random.uniform(0.9, 1.1))
             self.effectiveness_message = "¡Es super efectivo!"
-        elif eff=="not_very":
-            dmg = int(base*0.7*random.uniform(0.9,1.1))
+        elif eff == "not_very":
+            dmg = int(base * 0.7 * random.uniform(0.9, 1.1))
             self.effectiveness_message = "No es muy efectivo..."
         else:
-            dmg = int(base*random.uniform(0.85,1.0))
+            dmg = int(base * random.uniform(0.85, 1.0))
 
         self.opponent_hp = max(0, self.opponent_hp - dmg)
         self.turn_phase = "opponent"
         self.selected_attack = None
 
-        if self.opponent_hp<=0:
-            self.message = f"¡{self.opponent_pokemon} fue derrotado! ¡Ganaste!"
+        if self.opponent_hp <= 0:
+            self.message = f"¡{self.opponent_pokemon.name} fue derrotado! ¡Ganaste!"
             arcade.unschedule(self.ai_turn)
 
     def ai_turn(self, dt):
-        """Turno IA."""
-        if self.turn_phase!="opponent":
+        if self.turn_phase != "opponent":
             return
-        
-        moves = POKEMON_DATA[self.opponent_pokemon]["attacks"]
 
-        atk = random.choice(moves)
-        self.message = f"¡{self.opponent_pokemon} usó {atk['name']}!"
+        atk = random.choice(self.opponent_pokemon.moves)
+        self.message = f"¡{self.opponent_pokemon.name} usó {atk.name}!"
         self.effectiveness_message = ""
-        eff = random.choice(["normal","super","not_very"])
-        base = atk["power"]
-        if eff=="super":
-            dmg = int(base*1.5*random.uniform(0.9,1.1))
+
+        eff = random.choice(["normal", "super", "not_very"])
+        base = atk.power
+
+        if eff == "super":
+            dmg = int(base * 1.5 * random.uniform(0.9, 1.1))
             self.effectiveness_message = "¡Es super efectivo!"
-        elif eff=="not_very":
-            dmg = int(base*0.7*random.uniform(0.9,1.1))
+        elif eff == "not_very":
+            dmg = int(base * 0.7 * random.uniform(0.9, 1.1))
             self.effectiveness_message = "No es muy efectivo..."
         else:
-            dmg = int(base*random.uniform(0.85,1.0))
+            dmg = int(base * random.uniform(0.85, 1.0))
 
         self.player_hp = max(0, self.player_hp - dmg)
         self.turn_phase = "player"
 
-        if self.player_hp<=0:
-            self.message = f"¡{self.player_pokemon} fue derrotado! ¡Perdiste!"
+        if self.player_hp <= 0:
+            self.message = f"¡{self.player_pokemon.name} fue derrotado! ¡Perdiste!"
             arcade.unschedule(self.ai_turn)
 
 
