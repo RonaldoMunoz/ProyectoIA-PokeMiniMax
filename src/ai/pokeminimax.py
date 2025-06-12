@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
-from battle.battle import BattleState
-from battle.pokemon import Move
-from battle.damage import calculate_damage
+from ..battle.battle import BattleState
+from ..battle.pokemon import Move
+from ..battle.damage import calculate_damage
 
 def evaluate_state(state: BattleState) -> float:
     """

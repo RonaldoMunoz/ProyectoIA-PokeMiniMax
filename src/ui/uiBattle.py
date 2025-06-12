@@ -3,13 +3,13 @@ import os
 import random
 import sys
 from pathlib import Path
-from battle.pokemon import Pokemon, Move
-from ai.pokeminimax import minimax
-from battle.damage import get_effectivenessMessage
-from battle.battle import BattleState
+from ..battle.pokemon import Pokemon, Move, create_pokemon, get_all_pokemon_names
+from ..ai.pokeminimax import minimax
+from ..battle.damage import get_effectivenessMessage
+from ..battle.battle import BattleState
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-from ..battle.pokemon import create_pokemon, Pokemon, get_all_pokemon_names
+
 
 
 # Configuración de la ventana
@@ -23,13 +23,7 @@ OPPONENT_SCALE = 1.6
 # Ruta a assets
 ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
 
-def create_pokemon(name: str) -> Pokemon:
-    """Crea una instancia de Pokémon con sus movimientos"""
-    data = POKEMON_DATA[name]
-    moves = [Move(move["name"], move["type"], move["power"]) for move in data["attacks"]]
-    return Pokemon(name, data["types"], data["hp"], moves)
 
-# 4. Vistas de la interfaz gráfica
 
 class MainMenuView(arcade.View):
     def __init__(self):
@@ -156,10 +150,14 @@ class PokemonBattleUI(arcade.View):
         opponent_name = random.choice(possible_opponents)
         self.opponent_pokemon = create_pokemon(opponent_name)
 
-        self.player_hp = self.player_pokemon.current_hp
-        self.player_max_hp = self.player_hp
-        self.opponent_hp = self.opponent_pokemon.current_hp
-        self.opponent_max_hp = self.opponent_hp
+        self.battle_state = BattleState(
+            player_pokemon=self.player_pokemon,
+            opponent_pokemon=self.opponent_pokemon,
+            player_team=[self.player_pokemon],
+            opponent_team=[self.opponent_pokemon],
+            current_turn=0  
+        )
+        
         self.message = "¡Comienza el combate!"
         self.effectiveness_message = ""
         self.attack_buttons = []
@@ -238,14 +236,18 @@ class PokemonBattleUI(arcade.View):
         # Barras de vida
         self.draw_health_bar(
             600, 520,
-            self.opponent_hp, self.opponent_max_hp,
-            self.opponent_pokemon.name, is_opponent=True
+            self.battle_state.opponent_pokemon.current_hp,
+            self.battle_state.opponent_pokemon.max_hp,
+            self.battle_state.opponent_pokemon.name,
+            is_opponent=True
         )
         
         self.draw_health_bar(
             200, 220,
-            self.player_hp, self.player_max_hp,
-            self.player_pokemon.name, is_opponent=False
+            self.battle_state.player_pokemon.current_hp,
+            self.battle_state.player_pokemon.max_hp,
+            self.battle_state.player_pokemon.name,
+            is_opponent=False
         )
 
         # Panel de ataques
@@ -321,7 +323,11 @@ class PokemonBattleUI(arcade.View):
         )
 
     def on_mouse_press(self, x, y, button, modifiers):
-        """Clic en ataques en turno del jugador"""
+        # Si el combate terminó, no hacer nada
+        if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
+            return
+
+        # Sólo procesar clics si es turno del jugador
         if button == arcade.MOUSE_BUTTON_LEFT and self.battle_state.current_turn == 0:
             for btn in self.attack_buttons:
                 if abs(x - btn["x"]) < 100 and abs(y - btn["y"]) < 15:
@@ -330,22 +336,25 @@ class PokemonBattleUI(arcade.View):
 
     def use_attack(self, move: Move):
         """Turno del jugador"""
-        #self.message = f"¡{self.player_pokemon.name} usó {move.name}!"
-        self.message = f"¡{self.player_pokemon.name} usó {attack['name']}!"
+        self.message = f"¡{self.player_pokemon.name} usó {move.name}!"
+        #self.message = f"¡{self.player_pokemon.name} usó {attack['name']}!"
         # Calcular efectividad para mensaje
         #self.effectiveness_message = self.battle_state.get_effectiveness_message(move, self.opponent_pokemon)
         self.effectiveness_message = get_effectivenessMessage(move, self.player_pokemon)
-        base = attack["move"].power
+        #base = attack["move"].power
         # Aplicar movimiento
         print("Turno del jugador:")
         print(f"Movimiento seleccionado por el Jugador: {move.name}")
         print(f"Tipo: {move.move_type}, Poder: {move.power}")
+        
         self.battle_state = self.battle_state.apply_action(move)
+        
         if self.battle_state.current_turn == 1:
             arcade.schedule(self.ai_turn, 1.0)
         
         # Verificar si el combate ha terminado
-        if self.battle_state.is_terminal():
+        if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
+            arcade.unschedule(self.ai_turn)
             if self.battle_state.opponent_pokemon.is_fainted:
                 self.message = f"¡{self.opponent_pokemon.name} fue derrotado! ¡Ganaste!"
             else:
@@ -373,15 +382,18 @@ class PokemonBattleUI(arcade.View):
             print("Turno de IA:")
             self.battle_state = self.battle_state.apply_action(best_move)
 
-        if self.battle_state.current_turn == 1:
-            arcade.schedule(self.ai_turn, 1.0)
             
             # Verificar si el combate ha terminado
-            if self.battle_state.is_terminal():
+            if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
+                arcade.unschedule(self.ai_turn)
+                # Mostrar mensaje final
                 if self.battle_state.player_pokemon.is_fainted:
                     self.message = f"¡{self.player_pokemon.name} fue derrotado! ¡Perdiste!"
                 else:
                     self.message = f"¡{self.opponent_pokemon.name} fue derrotado! ¡Ganaste!"
+        
+        if self.battle_state.current_turn == 1:
+            arcade.schedule(self.ai_turn, 1.0)
 
 
 def main():
