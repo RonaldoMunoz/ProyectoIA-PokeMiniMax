@@ -223,8 +223,6 @@ class PokemonBattleUI(arcade.View):
             }
             self.attack_buttons.append(button)
 
-        arcade.schedule(self.ai_turn, 3.0)
-
     def on_draw(self):
         """Renderizar todos los elementos"""
         self.clear()
@@ -367,7 +365,7 @@ class PokemonBattleUI(arcade.View):
         self.battle_state = self.battle_state.apply_action(move)
         
         if self.battle_state.current_turn == 1:
-            arcade.schedule(self.ai_turn, 1.0)
+            arcade.schedule(self.ai_turn, 2.0)
         
         # Verificar si el combate ha terminado
         if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
@@ -389,7 +387,7 @@ class PokemonBattleUI(arcade.View):
     def ai_turn(self, delta_time: float):
         arcade.unschedule(self.ai_turn)
         # Seleccionar mejor movimiento con Minimax
-        _, best_move = minimax(self.battle_state, depth=3)
+        _, best_move = minimax(self.battle_state, depth=3, maximizing=False)
         
         if best_move:
             self.message = f"¡{self.opponent_pokemon.name} usó {best_move.name}!"
