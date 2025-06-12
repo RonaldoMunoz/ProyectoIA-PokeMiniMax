@@ -7,7 +7,6 @@ class Move:
     name: str
     move_type: str
     power: int
-    accuracy: int = 100  # Para futuras expansiones
 
 class Pokemon:
     """Representa un Pokémon con sus atributos"""
