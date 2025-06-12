@@ -25,9 +25,6 @@ class Pokemon:
         if self.current_hp == 0:
             self.is_fainted = True
     
-    def has_usable_move(self) -> bool:
-        """Verifica si tiene al menos un movimiento usable"""
-        return len(self.moves) > 0
     
     def __str__(self):
         return f"{self.name} ({'/'.join(self.types)}) - PS: {self.current_hp}/{self.max_hp}"
