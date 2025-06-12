@@ -23,6 +23,11 @@ OPPONENT_SCALE = 1.6
 # Ruta a assets
 ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
 
+def stop_current_music(window):
+    """Detiene la música actual si está sonando."""
+    if hasattr(window, "music_player") and window.music_player is not None:
+        arcade.stop_sound(window.music_player)
+        window.music_player = None
 
 
 class MainMenuView(arcade.View):
@@ -33,12 +38,20 @@ class MainMenuView(arcade.View):
         self.button_color = arcade.color.YELLOW
         self.button_hover_color = arcade.color.GOLD
         self.current_button_color = self.button_color
+        self.window.music_player = None
+
 
     def on_show(self):
         # Cargar fondo
         background_path = os.path.join(ASSETS_PATH, "backgrounds", "fondomenu.jpg")
         if os.path.exists(background_path):
             self.background = arcade.load_texture(background_path)
+
+        # Cargar música
+        music_path = os.path.join(ASSETS_PATH, "music", "pokemonmusic.wav")
+        if os.path.exists(music_path): 
+            self.menu_music = arcade.load_sound(music_path)
+            self.window.music_player = self.menu_music.play(loop=True)
 
         # Registrar fuente personalizada
         self.font_name = "Pokemon Hollow"
@@ -47,6 +60,7 @@ class MainMenuView(arcade.View):
 
         # Definir botón
         self.button_rect = arcade.get_rectangle_points(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 300, 60, 20)
+
 
     def on_draw(self):
         self.clear()
@@ -166,6 +180,9 @@ class PokemonBattleUI(arcade.View):
         self.background = None
         self.player_sprite = None
         self.opponent_sprite = None
+        self.battle_over = False
+        self.result = None  # "win" o "lose"
+
 
         # Fuente y fondo
         font_path = os.path.join(ASSETS_PATH, "fonts", "pokemon.ttf")
@@ -355,13 +372,19 @@ class PokemonBattleUI(arcade.View):
         # Verificar si el combate ha terminado
         if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
             arcade.unschedule(self.ai_turn)
+            self.battle_over = True
+
             if self.battle_state.opponent_pokemon.is_fainted:
-                self.message = f"¡{self.opponent_pokemon.name} fue derrotado! ¡Ganaste!"
+                self.message = f"¡{self.opponent_pokemon.name} fue derrotado!"
+                self.result = "Ganaste"
             else:
-                self.message = f"¡{self.player_pokemon.name} fue derrotado! ¡Perdiste!"
+                self.message = f"¡{self.player_pokemon.name} fue derrotado!"
+                self.result = "Perdiste"
+
+            # Esperar 2 segundos antes de mostrar el resultado
+            arcade.schedule(self.show_result, 2.0)
             return
-        
-        
+
 
     def ai_turn(self, delta_time: float):
         arcade.unschedule(self.ai_turn)
@@ -384,16 +407,80 @@ class PokemonBattleUI(arcade.View):
 
             
             # Verificar si el combate ha terminado
-            if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
-                arcade.unschedule(self.ai_turn)
-                # Mostrar mensaje final
-                if self.battle_state.player_pokemon.is_fainted:
-                    self.message = f"¡{self.player_pokemon.name} fue derrotado! ¡Perdiste!"
-                else:
-                    self.message = f"¡{self.opponent_pokemon.name} fue derrotado! ¡Ganaste!"
+        if self.battle_state.is_terminal() or self.battle_state.player_pokemon.is_fainted or self.battle_state.opponent_pokemon.is_fainted:
+            arcade.unschedule(self.ai_turn)
+            self.battle_over = True
+
+            if self.battle_state.player_pokemon.is_fainted:
+                self.message = f"¡{self.player_pokemon.name} fue derrotado!"
+                self.result = "Perdiste"
+            else:
+                self.message = f"¡{self.opponent_pokemon.name} fue derrotado!"
+                self.result = "Ganaste"
+
+            # Esperar 2 segundos antes de mostrar el resultado
+            arcade.schedule(self.show_result, 2.0)
+            return
         
-        if self.battle_state.current_turn == 1:
-            arcade.schedule(self.ai_turn, 1.0)
+    def show_result(self, delta_time):
+        arcade.unschedule(self.show_result)
+        result_view = BattleResultView(self.result)
+        self.window.show_view(result_view)
+
+class BattleResultView(arcade.View):
+    def __init__(self, result: str):
+        super().__init__()
+        self.result = result
+        self.background = None
+        self.font = None
+
+        # Cargar fondo
+        bg_path = os.path.join(ASSETS_PATH, "backgrounds", "final2.jpg")
+        if os.path.exists(bg_path):
+            self.background = arcade.load_texture(bg_path)
+
+        # Cargar fuente
+        font_path = os.path.join(ASSETS_PATH, "fonts", "Pokemon_Solid.ttf")
+        arcade.load_font(font_path)
+        self.font = "Pokemon Solid"
+
+        font_path = os.path.join(ASSETS_PATH, "fonts", "Pokemon Hollow.ttf")
+        arcade.load_font(font_path)
+        self.font2 = "Pokemon Hollow"
+
+    def on_draw(self):
+        self.clear()
+
+        if self.background:
+            arcade.draw_lrwh_rectangle_textured(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, self.background)
+
+        color = arcade.color.GREEN if "Ganaste" in self.result else arcade.color.RED
+        arcade.draw_text(self.result, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100,
+                         color, 70, anchor_x="center", font_name=self.font)
+
+        # Botón "Volver a jugar"
+        arcade.draw_rectangle_filled(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50, 250, 50, arcade.color.YELLOW)
+        arcade.draw_text("Volver a jugar", SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60,
+                         arcade.color.BLACK, 20, anchor_x="center", font_name=self.font2)
+
+        # Botón "Salir"
+        arcade.draw_rectangle_filled(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 120, 250, 50, arcade.color.LIGHT_GRAY)
+        arcade.draw_text("Salir del juego", SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 130,
+                         arcade.color.BLACK, 20, anchor_x="center", font_name=self.font2)
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        if button == arcade.MOUSE_BUTTON_LEFT:
+            # "Volver a jugar"
+            if SCREEN_WIDTH // 2 - 125 < x < SCREEN_WIDTH // 2 + 125 and SCREEN_HEIGHT // 2 - 75 < y < SCREEN_HEIGHT // 2 - 25:
+                stop_current_music(self.window)
+                menu_view = MainMenuView()
+                self.window.show_view(menu_view)
+
+            # "Salir"
+            elif SCREEN_WIDTH // 2 - 125 < x < SCREEN_WIDTH // 2 + 125 and SCREEN_HEIGHT // 2 - 145 < y < SCREEN_HEIGHT // 2 - 95:
+                arcade.close_window()
+
+
 
 
 def main():
