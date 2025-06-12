@@ -22,14 +22,7 @@ def evaluate_state(state: BattleState) -> float:
     )
     type_score = best / state.opponent_pokemon.max_hp
 
-    # 3) Pokémon restantes
-    alive_player   = sum(not p.is_fainted for p in state.player_team)
-    alive_opponent = sum(not p.is_fainted for p in state.opponent_team)
-    remaining_score = alive_player - alive_opponent
-
-    return hp_score * 0.6 + type_score * 0.3 + remaining_score * 0.1
-
-
+    return hp_score * 0.6 + type_score * 0.4
 def minimax(
     state: BattleState,
     depth: int,
