@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from ..battle.pokemon import Pokemon, Move, create_pokemon, get_all_pokemon_names
 from ..ai.pokeminimax import minimax
-from ..battle.damage import get_effectivenessMessage
+from ..battle.damage import get_effectivenessMessage, calculate_damage
 from ..battle.battle import BattleState
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
@@ -13,8 +13,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 
 # Configuración de la ventana
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 700
 SCREEN_TITLE = "Pokeminmax"
 # Factores de escala
 PLAYER_SCALE   = 1.6
@@ -163,7 +163,8 @@ class PokemonBattleUI(arcade.View):
         possible_opponents = [name for name in get_all_pokemon_names() if name != selected_pokemon.name]
         opponent_name = random.choice(possible_opponents)
         self.opponent_pokemon = create_pokemon(opponent_name)
-
+        self.last_attack_info = ""  # <-- aquí almacenaremos el log
+        self.effectiveness_message = ""  # Mensaje de efectividad del ataque
         self.battle_state = BattleState(
             player_pokemon=self.player_pokemon,
             opponent_pokemon=self.opponent_pokemon,
@@ -182,6 +183,8 @@ class PokemonBattleUI(arcade.View):
         self.opponent_sprite = None
         self.battle_over = False
         self.result = None  # "win" o "lose"
+        self.log_time = 0.0
+        self.LOG_DURATION = 5.0 
 
 
         # Fuente y fondo
@@ -195,6 +198,15 @@ class PokemonBattleUI(arcade.View):
             self.background = arcade.load_texture(bg_path)
 
         self.setup()
+    
+    def on_update(self, delta_time: float):
+        # Reducir el temporizador
+        if self.log_time > 0:
+            self.log_time -= delta_time
+            if self.log_time <= 0:
+                # Cuando se acabe, limpiamos los mensajes
+                self.last_attack_info = ""
+                self.effectiveness_message = ""
 
     def setup(self):
         player_path = os.path.join(ASSETS_PATH, "pokemon", f"{self.player_pokemon.name}.png")
@@ -300,7 +312,46 @@ class PokemonBattleUI(arcade.View):
             anchor_x="center", anchor_y="center",
             font_name=self.font
             )
+        # 2) Finalmente, el “log” tipo Game Boy debajo:
 
+        if self.log_time > 0:
+            log_width, log_height = 300, 80
+            # margen derecho e inferior
+            margin = 12
+            log_x = SCREEN_WIDTH - log_width/2 - margin
+            log_y = log_height/2 + margin
+
+            # Fondo semitransparente
+            arcade.draw_rectangle_filled(
+                log_x, log_y,
+                log_width, log_height,
+                (*arcade.color.BLACK[:3], 180)
+            )
+
+            padding = 8
+            text_x = log_x - log_width/2 + padding
+            # alineamos la primera línea arriba dentro del recuadro
+            text_y = log_y + log_height/2 - padding - 2
+
+            # Línea 1: daño y tipo
+            arcade.draw_text(
+                self.last_attack_info,
+                text_x, text_y,
+                arcade.color.WHITE, 10,
+                width=log_width - 2*padding,
+                align="left",
+                font_name=self.font
+            )
+
+            # Línea 2: efectividad
+            arcade.draw_text(
+                self.effectiveness_message,
+                text_x, text_y - 18,
+                arcade.color.LIGHT_GRAY, 8,
+                width=log_width - 2*padding,
+                align="left",
+                font_name=self.font
+            )
     def draw_health_bar(self, x, y, current, maximum, name, is_opponent):
         """Barra de vida estilo Pokémon con texto"""
         # Fondo y borde
@@ -354,8 +405,11 @@ class PokemonBattleUI(arcade.View):
         self.message = f"¡{self.player_pokemon.name} usó {move.name}!"
         #self.message = f"¡{self.player_pokemon.name} usó {attack['name']}!"
         # Calcular efectividad para mensaje
-        #self.effectiveness_message = self.battle_state.get_effectiveness_message(move, self.opponent_pokemon)
-        self.effectiveness_message = get_effectivenessMessage(move, self.player_pokemon)
+        damage = calculate_damage(move, self.player_pokemon, self.opponent_pokemon)
+        self.last_attack_info = f"{move.name} ({move.move_type}) hizo {damage} pts."
+        self.effectiveness_message = get_effectivenessMessage(move, self.opponent_pokemon)
+        self.log_time = self.LOG_DURATION
+
         #base = attack["move"].power
         # Aplicar movimiento
         print("Turno del jugador:")
@@ -390,15 +444,17 @@ class PokemonBattleUI(arcade.View):
         _, best_move = minimax(self.battle_state, depth=3, maximizing=False)
         
         if best_move:
+            damage = calculate_damage(best_move, self.opponent_pokemon, self.player_pokemon)
+            self.last_attack_info = f"{best_move.name} ({best_move.move_type}) hizo {damage} pts."
             self.message = f"¡{self.opponent_pokemon.name} usó {best_move.name}!"
             movimiento = Move(best_move.name, best_move.move_type, best_move.power)
             print(f"Movimiento seleccionado por IA: {movimiento.name}")
             print(f"Tipo: {movimiento.move_type}, Poder: {movimiento.power}")
             
             # Calcular efectividad para mensaje
-            self.effectiveness_message = self.battle_state.get_effectiveness_message
-            (movimiento, self.player_pokemon)
-            
+            self.effectiveness_message = get_effectivenessMessage(best_move, self.player_pokemon)
+            self.log_time = self.LOG_DURATION
+
             # Aplicar movimiento
             print("Turno de IA:")
             self.battle_state = self.battle_state.apply_action(best_move)
@@ -419,7 +475,8 @@ class PokemonBattleUI(arcade.View):
             # Esperar 2 segundos antes de mostrar el resultado
             arcade.schedule(self.show_result, 2.0)
             return
-        
+
+
     def show_result(self, delta_time):
         arcade.unschedule(self.show_result)
         result_view = BattleResultView(self.result)
