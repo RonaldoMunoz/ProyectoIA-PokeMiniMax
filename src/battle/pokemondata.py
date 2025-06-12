@@ -3,7 +3,7 @@
 POKEMON_DATA = {
     "Pikachu": {
         "types": ["Electric"],
-        "hp": 50,
+        "hp": 150,
         "moves": [
             {"name": "Impactrueno", "type": "Electric", "power": 40},
             {"name": "Ataque Rápido", "type": "Normal", "power": 30},
@@ -12,7 +12,7 @@ POKEMON_DATA = {
     },
     "Charmander": {
         "types": ["Fire"],
-        "hp": 65,
+        "hp": 165,
         "moves": [
             {"name": "Ascuas", "type": "Fire", "power": 40},
             {"name": "Arañazo", "type": "Normal", "power": 30},
@@ -20,7 +20,7 @@ POKEMON_DATA = {
     },
     "Bulbasaur": {
         "types": ["Grass", "Poison"],
-        "hp": 68,
+        "hp": 168,
         "moves": [
             {"name": "Látigo Cepa", "type": "Grass", "power": 45},
             {"name": "Placaje", "type": "Normal", "power": 30},
@@ -28,7 +28,7 @@ POKEMON_DATA = {
     },
     "Squirtle": {
         "types": ["Water"],
-        "hp": 66,
+        "hp": 166,
         "moves": [
             {"name": "Pistola Agua", "type": "Water", "power": 40},
             {"name": "Paclaje", "type": "Normal", "power": 30},
@@ -36,7 +36,7 @@ POKEMON_DATA = {
     },
     "Charizard": {
         "types": ["Fire", "Flying"],
-        "hp": 78,
+        "hp": 178,
         "moves": [
             {"name": "Lanzallamas", "type": "Fire", "power": 90},
             {"name": "Garra Dragón", "type": "Dragon", "power": 80},
@@ -46,7 +46,7 @@ POKEMON_DATA = {
     },
     "Blastoise": {
         "types": ["Water"],
-        "hp": 79,
+        "hp": 179,
         "moves": [
             {"name": "Hidrobomba", "type": "Water", "power": 110},
             {"name": "Rayo Hielo", "type": "Ice", "power": 90},
@@ -56,7 +56,7 @@ POKEMON_DATA = {
     },
     "Meowth": {
         "types": ["Normal"],
-        "hp": 50,
+        "hp": 150,
         "moves": [
             {"name": "Arañazo", "type": "Normal", "power": 30},
             {"name": "Mordisco", "type": "Dark", "power": 60},
